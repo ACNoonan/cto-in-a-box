@@ -13,12 +13,19 @@
 - Promote by fast-forward merge only
 - Do not create feature branches unless there is a strong reason
 
+## Domain Model
+
+Core domain: **{{CORE_DOMAIN_NAME}}** — {{CORE_DOMAIN_DESCRIPTION}}
+
+Full domain map and ubiquitous language in [`DOMAIN.md`](./DOMAIN.md). Read it before generating code or prose so terminology stays consistent across the workspace.
+
 ## Operating Rules
 
 - Run git commands inside the correct child repo, never from the workspace root.
 - Keep shared ops scripts in `infrastructure/scripts/`.
 - Treat the parent workspace as the system of record for cross-repo conventions.
 - Keep agent guidance at the workspace root and deep domain guidance closer to code.
+- Keep `DOMAIN.md` roughly honest — add terms as they appear in conversations, do not silently coin new synonyms in code.
 
 ## CI/CD Expectations
 

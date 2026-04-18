@@ -79,6 +79,12 @@ Every significant opinion in the playbook — ECS as the default compute target,
 
 ADRs use [Michael Nygard's original format](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions) and are append-only: to change a decision, write a new ADR that supersedes the old one. See [`adr/README.md`](./adr/README.md) for conventions.
 
+## Domain-Driven Design lens
+
+CTO in a Box uses the **strategic** half of Domain-Driven Design (Evans, 2003) as a lens for shaping the bootstrap questionnaire and the generated workspace. The questionnaire asks for the *core domain* (every phase), and — at Phase 1+ — supporting subdomains, expected bounded contexts, and seed glossary terms. The answers render into a `DOMAIN.md` at the workspace root that agents and contributors read before generating code.
+
+Tactical DDD (aggregates, entities, value objects, repositories) is deliberately **out of scope** for the bootstrapper — see [`adr/0007-strategic-ddd-lens.md`](./adr/0007-strategic-ddd-lens.md) for the reasoning. New to DDD? Start with [`docs/ddd-primer.md`](./docs/ddd-primer.md).
+
 ## Philosophy
 
 Four ideas do most of the work:

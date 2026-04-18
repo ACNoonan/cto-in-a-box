@@ -16,6 +16,14 @@ The parent workspace exists to make cross-repo engineering predictable:
 
 {{REPO_BULLETS}}
 
+## Domain Model
+
+Core domain: **{{CORE_DOMAIN_NAME}}**
+
+{{CORE_DOMAIN_DESCRIPTION}}
+
+Full bounded-context map, supporting subdomains, and the ubiquitous language glossary live in [`DOMAIN.md`](./DOMAIN.md). Agents and contributors should read from that glossary before writing code or generating prose — two files using different words for the same concept is a bug in the model.
+
 ## Default Conventions
 
 - Region: `{{AWS_REGION}}`

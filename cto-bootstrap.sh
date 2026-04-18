@@ -267,6 +267,21 @@ ecr_namespace="$(prompt "ECR repo namespace prefix (used once deployed)" "$proje
 expo_account_slug="$(prompt "Expo account slug (mobile only; leave blank if N/A)" "$project_slug")"
 environments="$(prompt "Environments (comma separated)" "$default_environments")"
 
+# Strategic DDD lens — see docs/ddd-primer.md for the concepts behind these prompts.
+echo ""
+echo "Domain (strategic DDD lens — see docs/ddd-primer.md)"
+core_domain_name="$(prompt "Core domain name (what this product is trying to be excellent at)" "$project_name")"
+core_domain_description="$(prompt "Core domain — one-sentence description")"
+
+supporting_subdomains=""
+bounded_contexts=""
+ubiquitous_language=""
+if (( current_phase >= 1 )); then
+  supporting_subdomains="$(prompt "Supporting subdomains in scope now (comma separated, blank for none)")"
+  bounded_contexts="$(prompt "Expected bounded contexts at this phase (comma separated, blank for none)")"
+  ubiquitous_language="$(prompt "Seed glossary terms (comma separated, blank to fill in later)")"
+fi
+
 backend_services="$(prompt "Backend services in scope for this phase (comma separated, blank for none)" "${project_slug}-api")"
 
 portal_apps=""
@@ -482,6 +497,15 @@ cat > "$manifest_path" <<EOF
     "prod": "$(json_escape "$prod_branch")"
   },
   "environments": $(csv_to_json_array "$environments"),
+  "domain": {
+    "coreDomain": {
+      "name": "$(json_escape "$core_domain_name")",
+      "description": "$(json_escape "$core_domain_description")"
+    },
+    "supportingSubdomains": $(csv_to_json_array "$supporting_subdomains"),
+    "boundedContexts": $(csv_to_json_array "$bounded_contexts"),
+    "ubiquitousLanguage": $(csv_to_json_array "$ubiquitous_language")
+  },
   "repos": [${repo_json}],
   "backendServices": $(csv_to_json_array "$backend_services"),
   "webApps": $(csv_to_json_array "$portal_apps"),
@@ -549,10 +573,43 @@ else
   mobile_apps_config_lines="    # TODO: add one line per mobile app. See script header for format."
 fi
 
+supporting_subdomain_list=()
+while IFS= read -r item; do
+  [[ -z "$item" ]] && continue
+  supporting_subdomain_list+=("$item")
+done < <(csv_to_array "$supporting_subdomains")
+
+bounded_context_list=()
+while IFS= read -r item; do
+  [[ -z "$item" ]] && continue
+  bounded_context_list+=("$item")
+done < <(csv_to_array "$bounded_contexts")
+
+ubiquitous_language_list=()
+while IFS= read -r item; do
+  [[ -z "$item" ]] && continue
+  ubiquitous_language_list+=("$item")
+done < <(csv_to_array "$ubiquitous_language")
+
+supporting_subdomain_bullets="$(array_to_bullets "- None identified yet." "${supporting_subdomain_list[@]}")"
+bounded_context_bullets="$(array_to_bullets "- TBD — record bounded contexts as they emerge." "${bounded_context_list[@]}")"
+ubiquitous_language_bullets="$(array_to_bullets "- TBD — seed glossary after first customer or domain-expert conversation." "${ubiquitous_language_list[@]}")"
+
+if [[ -z "$core_domain_description" ]]; then
+  core_domain_description_display="_Not set — fill in during the first domain conversation._"
+else
+  core_domain_description_display="$core_domain_description"
+fi
+
 export CTO_PROJECT_NAME="$project_name"
 export CTO_PROJECT_SLUG="$project_slug"
 export CTO_WORKSPACE_NAME="$workspace_name"
 export CTO_AWS_REGION="$aws_region"
+export CTO_CORE_DOMAIN_NAME="$core_domain_name"
+export CTO_CORE_DOMAIN_DESCRIPTION="$core_domain_description_display"
+export CTO_SUPPORTING_SUBDOMAIN_BULLETS="$supporting_subdomain_bullets"
+export CTO_BOUNDED_CONTEXT_BULLETS="$bounded_context_bullets"
+export CTO_UBIQUITOUS_LANGUAGE_BULLETS="$ubiquitous_language_bullets"
 export CTO_DEV_BRANCH="$dev_branch"
 export CTO_PROD_BRANCH="$prod_branch"
 export CTO_PHASE_NAME="$phase_title_text"
@@ -583,6 +640,7 @@ export CTO_DB_SECRET_ID_DEV="${project_slug}/dev/database-url"
 if [[ "$render_templates" == "true" ]]; then
   render_template_file "${TEMPLATE_ROOT}/workspace/AGENTS.md.tpl" "${workspace_root}/AGENTS.md"
   render_template_file "${TEMPLATE_ROOT}/workspace/CLAUDE.md.tpl" "${workspace_root}/CLAUDE.md"
+  render_template_file "${TEMPLATE_ROOT}/workspace/DOMAIN.md.tpl" "${workspace_root}/DOMAIN.md"
 
   if [[ "$include_agent_harness" == "true" ]]; then
     render_template_file "${TEMPLATE_ROOT}/workspace/.cursor/rules/repo-structure.mdc.tpl" "${workspace_root}/.cursor/rules/repo-structure.mdc"
