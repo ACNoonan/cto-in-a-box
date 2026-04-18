@@ -64,6 +64,7 @@ Depending on the phase you pick, the bootstrapper generates the subset of the fo
 .
 ├── CTO-IN-A-BOX.md        The written playbook: principles, phases, defaults, anti-patterns.
 ├── cto-bootstrap.sh       Interactive bootstrapper. Writes manifest + optional scaffold.
+├── adr/                   Architecture Decision Records explaining why each default exists.
 └── cto-templates/
     ├── repo/              Per-repo-type workflow templates (backend, web, mobile, infra, automation).
     ├── scripts/           Ops script templates (deploy checks, logs, DB tunnel, migration checks).
@@ -71,6 +72,12 @@ Depending on the phase you pick, the bootstrapper generates the subset of the fo
 ```
 
 Templates use `{{VAR}}` placeholders that the script substitutes from your answers.
+
+## Architecture Decision Records
+
+Every significant opinion in the playbook — ECS as the default compute target, Terraform as the default IaC, phase-gated scaffolding, workspace-as-operating-layer — has a corresponding ADR in [`adr/`](./adr/). Each ADR captures the context that forced the choice, the decision itself, and the consequences of taking it.
+
+ADRs use [Michael Nygard's original format](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions) and are append-only: to change a decision, write a new ADR that supersedes the old one. See [`adr/README.md`](./adr/README.md) for conventions.
 
 ## Philosophy
 
