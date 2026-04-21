@@ -1,7 +1,7 @@
 # 4. Default compute target is ECS Fargate, not Kubernetes
 
 Date: 2026-04-18
-Status: Accepted
+Status: Accepted (amended by [0008](./0008-railway-paas-before-ecs.md) — Railway is the default for Phase 1; ECS applies from Phase 2+)
 
 ## Context
 

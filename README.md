@@ -17,7 +17,7 @@ The first useful version of the script deliberately does **not** create cloud re
 - Platform engineers who have built this operating system by hand more than once and want to stop doing that.
 - Teams moving from a local MVP to a deployed demo to a real production baseline, who want the jump to be a checklist rather than an improvisation.
 
-It is **not** a stack brochure. The opinions (AWS + Terraform + ECS, TypeScript + Bun + Hono + Prisma, Next.js, Expo, GitHub Actions) exist because repeated decisions compound and platform variance has a real tax — but they are overridable when a real constraint justifies it.
+It is **not** a stack brochure. The opinions (Railway for early deploy → AWS + Terraform + ECS for production, TypeScript + Bun + Hono + Prisma, Next.js, Expo, GitHub Actions) exist because repeated decisions compound and platform variance has a real tax — but they are overridable when a real constraint justifies it.
 
 ## Quickstart
 
@@ -34,15 +34,9 @@ cd cto-in-a-box
 ./cto-bootstrap.sh
 ```
 
-You'll be asked for:
+The questionnaire adapts to the phase you pick. At Phase 0 (Local MVP) you answer about six questions. AWS, ECS, and Terraform prompts only appear at Phase 2+ when they're actually needed.
 
-- project name, slug, workspace folder name
-- current maturity phase (0–4)
-- AWS region, GitHub org, branch names, ECS/WAF/ECR naming
-- which delivery surfaces are in scope now (backend services, web apps, mobile apps, internal tools, platform API, realtime service, automations)
-- whether to include the agent harness, contract harness, preview environments, and demo environment
-
-The script writes a manifest (`cto-bootstrap-manifest.json`) and — if you say yes — scaffolds a local workspace with a handbook, repo plan, and starter templates for infrastructure, backend, web, mobile, automation, ops scripts, and an agent harness for Claude Code / Cursor / Codex.
+The script writes a manifest (`cto-bootstrap-manifest.json`) and — if you say yes — scaffolds a local workspace with a handbook, repo plan, and starter templates. Phase 0–1 gets a Railway-oriented deploy workflow; Phase 2+ gets the full AWS + Terraform + ECS scaffolding with ops scripts.
 
 Nothing is pushed anywhere. Inspect, edit, commit, iterate.
 
@@ -52,9 +46,9 @@ Depending on the phase you pick, the bootstrapper generates the subset of the fo
 
 | Phase | Typical output |
 | --- | --- |
-| 0 — Local MVP | Parent workspace handbook, `AGENTS.md`, `CLAUDE.md`, `.cursor/rules/`, `.claude/settings.json`, first backend or surface scaffold |
-| 1 — Deployed Demo | Above, plus `infrastructure/` with Terraform roots and a first backend deploy workflow |
-| 2 — Production Baseline | Path-aware Terraform workflows, backend + web CI/CD guardrails, ops scripts starter pack (`check-deployment.sh`, `ecs-logs.sh`, `db-tunnel.sh`, WAF/VPC flow log readers) |
+| 0 — Local MVP | Parent workspace handbook, `AGENTS.md`, `CLAUDE.md`, `.cursor/rules/`, `.claude/settings.json`, first backend scaffold |
+| 1 — Deployed Demo | Above, plus Railway-oriented CI/deploy workflow for backend services |
+| 2 — Production Baseline | `infrastructure/` with Terraform roots, ECS-oriented deploy workflows, ops scripts (`check-deployment.sh`, `ecs-logs.sh`, `db-tunnel.sh`, WAF/VPC flow log readers) |
 | 3 — Scale & Expansion | Mobile scaffold + release workflows, cross-repo contract harness, `automations/`, `internal-tools/` |
 | 4 — Reusable Platform | Template libraries, starter kits, standardized ops/agent harness packages |
 
@@ -75,7 +69,7 @@ Templates use `{{VAR}}` placeholders that the script substitutes from your answe
 
 ## Architecture Decision Records
 
-Every significant opinion in the playbook — ECS as the default compute target, Terraform as the default IaC, phase-gated scaffolding, workspace-as-operating-layer — has a corresponding ADR in [`adr/`](./adr/). Each ADR captures the context that forced the choice, the decision itself, and the consequences of taking it.
+Every significant opinion in the playbook — Railway before ECS, ECS as the production compute target, Terraform as the default IaC, phase-gated scaffolding, workspace-as-operating-layer — has a corresponding ADR in [`adr/`](./adr/). Each ADR captures the context that forced the choice, the decision itself, and the consequences of taking it.
 
 ADRs use [Michael Nygard's original format](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions) and are append-only: to change a decision, write a new ADR that supersedes the old one. See [`adr/README.md`](./adr/README.md) for conventions.
 

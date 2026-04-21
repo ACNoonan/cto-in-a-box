@@ -5,6 +5,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE_ROOT="${SCRIPT_DIR}/cto-templates"
 
+# =============================================================================
+# Utility functions
+# =============================================================================
+
 trim() {
   local value="$1"
   value="${value#"${value%%[![:space:]]*}"}"
@@ -97,11 +101,11 @@ next_phase_id() {
 choose_phase() {
   local answer=""
   echo "Select the current phase to scaffold:" >&2
-  echo "  0) Local MVP: workspace, first domain model, local-only or lightly shared development" >&2
-  echo "  1) Deployed demo: first shared environment, first real deploy path" >&2
-  echo "  2) Production baseline: protected production flow, guardrails, ops scripts" >&2
-  echo "  3) Scale and expansion: more surfaces, contracts, internal tools, specialized services" >&2
-  echo "  4) Reusable platform: reusable templates, cross-cutting systems, standardization" >&2
+  echo "  0) Local MVP: workspace, first domain model, local-only development" >&2
+  echo "  1) Deployed demo: deploy to Railway (PaaS), first shared URL" >&2
+  echo "  2) Production baseline: graduate to AWS + ECS + Terraform, guardrails, ops scripts" >&2
+  echo "  3) Scale and expansion: more surfaces, contracts, internal tools" >&2
+  echo "  4) Reusable platform: reusable templates, standardization" >&2
   while true; do
     read -r -p "Phase [0]: " answer
     answer="$(trim "${answer:-0}")"
@@ -119,8 +123,8 @@ choose_phase() {
 
 phase_recommendation() {
   case "$1" in
-    0) printf 'Next phase focus: stand up the first shared deployed environment on the default AWS, Terraform, and ECS path.' ;;
-    1) printf 'Next phase focus: make production boring with branch protection, deploy checks, and ops scripts.' ;;
+    0) printf 'Next phase focus: deploy to Railway so stakeholders can access a shared demo.' ;;
+    1) printf 'Next phase focus: graduate to AWS + Terraform + ECS for production-grade infrastructure.' ;;
     2) printf 'Next phase focus: expand surfaces and services only where demand is real, then add contract discipline.' ;;
     3) printf 'Next phase focus: package the proven operating model into reusable templates and starter kits.' ;;
     4) printf 'Next phase focus: keep tightening templates and only add complexity when repeated use proves it belongs.' ;;
@@ -130,7 +134,7 @@ phase_recommendation() {
 
 phase_default_environments() {
   case "$1" in
-    0) printf 'local' ;;
+    0) printf '' ;;
     1) printf 'dev,demo' ;;
     2) printf 'dev,prod' ;;
     3|4) printf 'dev,prod,demo' ;;
@@ -233,12 +237,17 @@ PY
   generated_files+=("$output_path")
 }
 
+# =============================================================================
+# Interactive questionnaire
+# =============================================================================
+
 echo ""
 echo "CTO in a box bootstrap"
 echo "This version writes a manifest and can render starter workspace templates."
-echo "Default platform profile: AWS + Terraform + ECS unless you intentionally override it later."
-echo "It does not create GitHub repos, AWS resources, or secrets."
+echo "It does not create GitHub repos, cloud resources, or secrets."
 echo ""
+
+# --- Identity ---
 
 project_name="$(prompt "Project name")"
 default_slug="$(slugify "$project_name")"
@@ -254,20 +263,22 @@ else
   next_phase_title_text="None"
 fi
 phase_recommendation_text="$(phase_recommendation "$current_phase")"
-default_environments="$(phase_default_environments "$current_phase")"
-aws_region="$(prompt "Primary AWS region for the default platform profile" "eu-south-2")"
-github_org="$(prompt "GitHub org or user (for ops scripts)" "$project_slug")"
+
+# --- Branches ---
+
 dev_branch="$(prompt "Default working branch" "dev")"
 prod_branch="$(prompt "Default production branch" "main")"
-ecs_cluster="$(prompt "ECS cluster name (used once deployed)" "${project_slug}-cluster")"
-ecs_log_group="$(prompt "ECS CloudWatch log group (used once deployed)" "/ecs/${project_slug}")"
-waf_log_group="$(prompt "WAF log group (used once deployed)" "aws-waf-logs-${project_slug}")"
-vpc_flow_log_group="$(prompt "VPC flow log group (used once deployed)" "/aws/vpc/${project_slug}-flow-logs")"
-ecr_namespace="$(prompt "ECR repo namespace prefix (used once deployed)" "$project_slug")"
-expo_account_slug="$(prompt "Expo account slug (mobile only; leave blank if N/A)" "$project_slug")"
-environments="$(prompt "Environments (comma separated)" "$default_environments")"
 
-# Strategic DDD lens — see docs/ddd-primer.md for the concepts behind these prompts.
+# --- Environments (skip at Phase 0 — nothing deployed) ---
+
+environments=""
+if (( current_phase >= 1 )); then
+  default_environments="$(phase_default_environments "$current_phase")"
+  environments="$(prompt "Environments (comma separated)" "$default_environments")"
+fi
+
+# --- Domain (strategic DDD lens) ---
+
 echo ""
 echo "Domain (strategic DDD lens — see docs/ddd-primer.md)"
 core_domain_name="$(prompt "Core domain name (what this product is trying to be excellent at)" "$project_name")"
@@ -282,6 +293,10 @@ if (( current_phase >= 1 )); then
   ubiquitous_language="$(prompt "Seed glossary terms (comma separated, blank to fill in later)")"
 fi
 
+# --- Delivery surfaces ---
+
+echo ""
+echo "Delivery surfaces"
 backend_services="$(prompt "Backend services in scope for this phase (comma separated, blank for none)" "${project_slug}-api")"
 
 portal_apps=""
@@ -300,9 +315,14 @@ if (( current_phase >= 1 )); then
   fi
 fi
 
-if (( current_phase == 0 )); then
-  include_infra="$(prompt_yes_no "Include an infrastructure repo now? (recommended once you move beyond local MVP)" "n")"
+# --- Infrastructure & ops ---
+
+echo ""
+if (( current_phase <= 1 )); then
+  # Phase 0–1: no Terraform/AWS infra repo
+  include_infra="false"
 else
+  echo "Infrastructure (AWS + Terraform + ECS)"
   include_infra="true"
 fi
 
@@ -340,7 +360,42 @@ if (( current_phase >= 3 )); then
   fi
 fi
 
+# --- AWS / ECS specifics (Phase 2+ only) ---
+
+aws_region=""
+github_org=""
+ecs_cluster=""
+ecs_log_group=""
+waf_log_group=""
+vpc_flow_log_group=""
+ecr_namespace=""
+
+if (( current_phase >= 2 )); then
+  aws_region="$(prompt "Primary AWS region" "eu-south-2")"
+  ecs_cluster="$(prompt "ECS cluster name" "${project_slug}-cluster")"
+  ecs_log_group="$(prompt "ECS CloudWatch log group" "/ecs/${project_slug}")"
+  ecr_namespace="$(prompt "ECR repo namespace prefix" "$project_slug")"
+  waf_log_group="$(prompt "WAF log group" "aws-waf-logs-${project_slug}")"
+  vpc_flow_log_group="$(prompt "VPC flow log group" "/aws/vpc/${project_slug}-flow-logs")"
+fi
+
+# GitHub org needed from Phase 1+ (for CI workflows)
+if (( current_phase >= 1 )); then
+  github_org="$(prompt "GitHub org or user" "$project_slug")"
+fi
+
+# Expo slug only when mobile is in scope
+expo_account_slug=""
+if [[ "$include_mobile" == "true" ]]; then
+  expo_account_slug="$(prompt "Expo account slug" "$project_slug")"
+fi
+
+# --- Agent harness ---
+
+echo ""
 include_agent_harness="$(prompt_yes_no "Include Claude/Cursor/Codex harness?" "y")"
+
+# --- Contract harness (Phase 3+) ---
 
 if (( current_phase >= 3 )); then
   include_contract_harness="$(prompt_yes_no "Include cross-repo contract harness in this phase?" "y")"
@@ -348,29 +403,9 @@ else
   include_contract_harness="false"
 fi
 
-if (( current_phase >= 1 )); then
-  include_preview_envs="$(prompt_yes_no "Include preview environments?" "y")"
-else
-  include_preview_envs="false"
-fi
+# --- Output ---
 
-if (( current_phase >= 1 )); then
-  if (( current_phase == 1 )); then
-    demo_env_default="y"
-  else
-    demo_env_default="n"
-  fi
-  include_demo_env="$(prompt_yes_no "Include demo environment?" "$demo_env_default")"
-else
-  include_demo_env="false"
-fi
-
-if [[ "$include_mobile" == "true" ]]; then
-  include_testflight="$(prompt_yes_no "Include TestFlight and OTA workflow scaffolding?" "y")"
-else
-  include_testflight="false"
-fi
-
+echo ""
 workspace_root_default="./${workspace_name}"
 workspace_root="$(prompt "Workspace root to create or inspect" "$workspace_root_default")"
 manifest_path="$(prompt "Manifest output path" "${workspace_root}/cto-bootstrap-manifest.json")"
@@ -380,6 +415,10 @@ if [[ "$create_scaffold" == "true" ]]; then
 else
   render_templates="false"
 fi
+
+# =============================================================================
+# Derive repo plan
+# =============================================================================
 
 repo_names=()
 
@@ -431,6 +470,10 @@ if [[ "$include_internal_tools" == "true" ]]; then
   append_unique "internal-tools"
 fi
 
+# =============================================================================
+# Compute derived display values
+# =============================================================================
+
 repo_json=""
 for repo in "${repo_names[@]}"; do
   [[ -n "$repo_json" ]] && repo_json+=", "
@@ -455,13 +498,27 @@ else
   mobile_inline="none"
 fi
 
+# Determine compute target for manifest
+if (( current_phase <= 1 )); then
+  compute_target="railway"
+else
+  compute_target="ecs-fargate"
+fi
+
+# =============================================================================
+# Create scaffold directories
+# =============================================================================
+
 if [[ "$create_scaffold" == "true" ]]; then
   mkdir -p "$workspace_root"
-  mkdir -p "$workspace_root/work"
   for repo in "${repo_names[@]}"; do
     mkdir -p "$workspace_root/$repo"
   done
 fi
+
+# =============================================================================
+# Write manifest
+# =============================================================================
 
 manifest_dir="$(dirname "$manifest_path")"
 mkdir -p "$manifest_dir"
@@ -472,11 +529,10 @@ cat > "$manifest_path" <<EOF
   "projectSlug": "$(json_escape "$project_slug")",
   "workspaceName": "$(json_escape "$workspace_name")",
   "workspaceRoot": "$(json_escape "$workspace_root")",
-  "awsRegion": "$(json_escape "$aws_region")",
   "platformProfile": {
-    "cloud": "aws",
-    "iac": "terraform",
-    "compute": "ecs-fargate",
+    "cloud": "$(if (( current_phase >= 2 )); then echo 'aws'; else echo 'railway'; fi)",
+    "iac": "$(if (( current_phase >= 2 )); then echo 'terraform'; else echo 'none'; fi)",
+    "compute": "${compute_target}",
     "database": "postgresql",
     "backendRuntime": "bun",
     "backendFramework": "hono",
@@ -484,6 +540,7 @@ cat > "$manifest_path" <<EOF
     "mobileFramework": "expo",
     "ci": "github-actions"
   },
+  "awsRegion": "$(json_escape "$aws_region")",
   "architectureOverrides": [],
   "phase": {
     "id": ${current_phase},
@@ -518,49 +575,55 @@ cat > "$manifest_path" <<EOF
     "realtimeServiceRepo": $(bool_string "$include_realtime_service"),
     "agentHarness": $(bool_string "$include_agent_harness"),
     "contractHarness": $(bool_string "$include_contract_harness"),
-    "previewEnvironments": $(bool_string "$include_preview_envs"),
-    "demoEnvironment": $(bool_string "$include_demo_env"),
     "mobileIncluded": $(bool_string "$include_mobile"),
-    "testflightWorkflows": $(bool_string "$include_testflight"),
     "renderTemplates": $(bool_string "$render_templates")
   },
   "recommendedNextSteps": [
     "Confirm the selected phase and repo plan.",
     "Install the parent workspace handbook and agent harness files.",
-    "Keep the default AWS, Terraform, and ECS profile unless a real constraint justifies override.",
-    "Stand up the first shared deployed environment when moving beyond local MVP.",
-    "Tighten CI/CD and operational scripts before the first production launch.",
+$(if (( current_phase <= 1 )); then
+  echo '    "Deploy to Railway — link your GitHub repo and push to get a shared URL.",'
+  echo '    "When you need production-grade infra, re-run the bootstrapper at Phase 2 to graduate to AWS + Terraform + ECS."'
+else
+  echo '    "Keep the default AWS, Terraform, and ECS profile unless a real constraint justifies override.",'
+  echo '    "Tighten CI/CD and operational scripts before the first production launch."'
+fi),
     "Introduce cross-repo contracts only once multiple clients depend on shared APIs."
   ]
 }
 EOF
 
+# =============================================================================
+# Prepare template variables
+# =============================================================================
+
 generated_files=()
 
-# Build multi-line SERVICES_CONFIG arrays for ops scripts.
+# Build multi-line SERVICES_CONFIG arrays for ops scripts (Phase 2+ only).
 services_config_lines=""
 log_services_config_lines=""
-if [[ -n "${backend_repo_names[*]-}" ]]; then
-  for repo in "${backend_repo_names[@]}"; do
-    services_config_lines+="    \"${repo}:${repo}:${prod_branch}:prod:\"
+if (( current_phase >= 2 )); then
+  if [[ -n "${backend_repo_names[*]-}" ]]; then
+    for repo in "${backend_repo_names[@]}"; do
+      services_config_lines+="    \"${repo}:${repo}:${prod_branch}:prod:\"
 "
-    services_config_lines+="    \"dev-${repo}:${repo}:${dev_branch}:dev:dev-\"
+      services_config_lines+="    \"dev-${repo}:${repo}:${dev_branch}:dev:dev-\"
 "
-    log_services_config_lines+="    \"${repo}:${repo}\"
+      log_services_config_lines+="    \"${repo}:${repo}\"
 "
-    log_services_config_lines+="    \"dev-${repo}:dev-${repo}\"
+      log_services_config_lines+="    \"dev-${repo}:dev-${repo}\"
 "
-  done
-  # Strip trailing newline
-  services_config_lines="${services_config_lines%$'\n'}"
-  log_services_config_lines="${log_services_config_lines%$'\n'}"
-else
-  services_config_lines="    # TODO: add one line per ECS service. Format:"
-  services_config_lines+=$'\n'"    #   \"ecs_service:repo_name:git_branch:env:ecr_tag_prefix\""
-  log_services_config_lines="    # TODO: add one line per service. Format: \"service_name:stream_prefix\""
+    done
+    services_config_lines="${services_config_lines%$'\n'}"
+    log_services_config_lines="${log_services_config_lines%$'\n'}"
+  else
+    services_config_lines="    # TODO: add one line per ECS service. Format:"
+    services_config_lines+=$'\n'"    #   \"ecs_service:repo_name:git_branch:env:ecr_tag_prefix\""
+    log_services_config_lines="    # TODO: add one line per service. Format: \"service_name:stream_prefix\""
+  fi
 fi
 
-# Build mobile APPS_CONFIG lines (user must fill in EAS project IDs and ASC app IDs).
+# Build mobile APPS_CONFIG lines.
 mobile_apps_config_lines=""
 if [[ "$include_mobile" == "true" && -n "${mobile_repo_names[*]-}" ]]; then
   for app in "${mobile_repo_names[@]}"; do
@@ -573,6 +636,7 @@ else
   mobile_apps_config_lines="    # TODO: add one line per mobile app. See script header for format."
 fi
 
+# DDD display values
 supporting_subdomain_list=()
 while IFS= read -r item; do
   [[ -z "$item" ]] && continue
@@ -591,9 +655,9 @@ while IFS= read -r item; do
   ubiquitous_language_list+=("$item")
 done < <(csv_to_array "$ubiquitous_language")
 
-supporting_subdomain_bullets="$(array_to_bullets "- None identified yet." "${supporting_subdomain_list[@]}")"
-bounded_context_bullets="$(array_to_bullets "- TBD — record bounded contexts as they emerge." "${bounded_context_list[@]}")"
-ubiquitous_language_bullets="$(array_to_bullets "- TBD — seed glossary after first customer or domain-expert conversation." "${ubiquitous_language_list[@]}")"
+supporting_subdomain_bullets="$(array_to_bullets "- None identified yet." "${supporting_subdomain_list[@]+${supporting_subdomain_list[@]}}")"
+bounded_context_bullets="$(array_to_bullets "- TBD — record bounded contexts as they emerge." "${bounded_context_list[@]+${bounded_context_list[@]}}")"
+ubiquitous_language_bullets="$(array_to_bullets "- TBD — seed glossary after first customer or domain-expert conversation." "${ubiquitous_language_list[@]+${ubiquitous_language_list[@]}}")"
 
 if [[ -z "$core_domain_description" ]]; then
   core_domain_description_display="_Not set — fill in during the first domain conversation._"
@@ -601,10 +665,14 @@ else
   core_domain_description_display="$core_domain_description"
 fi
 
+# =============================================================================
+# Export template variables
+# =============================================================================
+
 export CTO_PROJECT_NAME="$project_name"
 export CTO_PROJECT_SLUG="$project_slug"
 export CTO_WORKSPACE_NAME="$workspace_name"
-export CTO_AWS_REGION="$aws_region"
+export CTO_AWS_REGION="${aws_region:-not-set}"
 export CTO_CORE_DOMAIN_NAME="$core_domain_name"
 export CTO_CORE_DOMAIN_DESCRIPTION="$core_domain_description_display"
 export CTO_SUPPORTING_SUBDOMAIN_BULLETS="$supporting_subdomain_bullets"
@@ -618,13 +686,13 @@ export CTO_BACKEND_SERVICES_INLINE="$backend_inline"
 export CTO_WEB_APPS_INLINE="$web_inline"
 export CTO_MOBILE_APPS_INLINE="$mobile_inline"
 export CTO_REPO_BULLETS="$repo_bullets"
-export CTO_GITHUB_ORG="$github_org"
-export CTO_ECS_CLUSTER="$ecs_cluster"
-export CTO_ECS_LOG_GROUP="$ecs_log_group"
-export CTO_WAF_LOG_GROUP="$waf_log_group"
-export CTO_VPC_FLOW_LOG_GROUP="$vpc_flow_log_group"
-export CTO_ECR_NAMESPACE="$ecr_namespace"
-export CTO_EXPO_ACCOUNT_SLUG="$expo_account_slug"
+export CTO_GITHUB_ORG="${github_org:-$project_slug}"
+export CTO_ECS_CLUSTER="${ecs_cluster:-${project_slug}-cluster}"
+export CTO_ECS_LOG_GROUP="${ecs_log_group:-/ecs/${project_slug}}"
+export CTO_WAF_LOG_GROUP="${waf_log_group:-aws-waf-logs-${project_slug}}"
+export CTO_VPC_FLOW_LOG_GROUP="${vpc_flow_log_group:-/aws/vpc/${project_slug}-flow-logs}"
+export CTO_ECR_NAMESPACE="${ecr_namespace:-$project_slug}"
+export CTO_EXPO_ACCOUNT_SLUG="${expo_account_slug:-$project_slug}"
 export CTO_SERVICES_CONFIG_LINES="$services_config_lines"
 export CTO_LOG_SERVICES_CONFIG_LINES="$log_services_config_lines"
 export CTO_MOBILE_APPS_CONFIG_LINES="$mobile_apps_config_lines"
@@ -637,11 +705,18 @@ export CTO_DB_NAME="${project_slug//-/_}"
 export CTO_DB_SECRET_ID="${project_slug}/prod/database-url"
 export CTO_DB_SECRET_ID_DEV="${project_slug}/dev/database-url"
 
+# =============================================================================
+# Render templates
+# =============================================================================
+
 if [[ "$render_templates" == "true" ]]; then
+
+  # --- Workspace docs (all phases) ---
   render_template_file "${TEMPLATE_ROOT}/workspace/AGENTS.md.tpl" "${workspace_root}/AGENTS.md"
   render_template_file "${TEMPLATE_ROOT}/workspace/CLAUDE.md.tpl" "${workspace_root}/CLAUDE.md"
   render_template_file "${TEMPLATE_ROOT}/workspace/DOMAIN.md.tpl" "${workspace_root}/DOMAIN.md"
 
+  # --- Agent harness (all phases, if enabled) ---
   if [[ "$include_agent_harness" == "true" ]]; then
     render_template_file "${TEMPLATE_ROOT}/workspace/.cursor/rules/repo-structure.mdc.tpl" "${workspace_root}/.cursor/rules/repo-structure.mdc"
     render_template_file "${TEMPLATE_ROOT}/workspace/.claude/settings.json.tpl" "${workspace_root}/.claude/settings.json"
@@ -649,36 +724,57 @@ if [[ "$render_templates" == "true" ]]; then
     render_template_file "${TEMPLATE_ROOT}/workspace/.claude/hooks/terraform-safety.sh.tpl" "${workspace_root}/.claude/hooks/terraform-safety.sh"
     chmod +x "${workspace_root}/.claude/hooks/pre-commit-lint.sh" "${workspace_root}/.claude/hooks/terraform-safety.sh"
 
-    # Agent rule skeletons — each ships with a self-prompt asking the agent to
-    # interview the user the first time it touches that domain.
     for rule in _README backend-patterns database-migrations deployment testing contracts mobile-patterns infrastructure operations security; do
       render_template_file "${TEMPLATE_ROOT}/workspace/.claude/rules/${rule}.md.tpl" "${workspace_root}/.claude/rules/${rule}.md"
     done
   fi
 
-  # Operational scripts become materially useful once there is deployed infrastructure.
-  if [[ "$include_infra" == "true" || "$current_phase" -ge 1 ]]; then
-    for script in check-deployment ecs-logs db-tunnel db-tunnel-dev terraform-pre-apply-guard prisma-check-sync waf-logs flow-logs check-mobile-builds; do
+  # --- Ops scripts (Phase 2+ only — these assume AWS/ECS infrastructure) ---
+  if (( current_phase >= 2 )); then
+    # Core ops scripts (always at Phase 2+)
+    for script in check-deployment ecs-logs db-tunnel terraform-pre-apply-guard prisma-check-sync; do
       render_template_file "${TEMPLATE_ROOT}/scripts/${script}.sh.tpl" "${workspace_root}/scripts/${script}.sh"
       chmod +x "${workspace_root}/scripts/${script}.sh"
     done
+
+    # WAF and VPC flow log scripts
+    for script in waf-logs flow-logs; do
+      render_template_file "${TEMPLATE_ROOT}/scripts/${script}.sh.tpl" "${workspace_root}/scripts/${script}.sh"
+      chmod +x "${workspace_root}/scripts/${script}.sh"
+    done
+
+    # Mobile build checker only when mobile is in scope
+    if [[ "$include_mobile" == "true" ]]; then
+      render_template_file "${TEMPLATE_ROOT}/scripts/check-mobile-builds.sh.tpl" "${workspace_root}/scripts/check-mobile-builds.sh"
+      chmod +x "${workspace_root}/scripts/check-mobile-builds.sh"
+    fi
   fi
 
+  # --- Infrastructure repo (Phase 2+) ---
   if [[ "$include_infra" == "true" ]]; then
     render_template_file "${TEMPLATE_ROOT}/repo/infrastructure/terraform.yml.tpl" "${workspace_root}/infrastructure/.github/workflows/terraform.yml"
   fi
 
+  # --- Automations repo ---
   if [[ "$include_automations" == "true" ]]; then
     render_template_file "${TEMPLATE_ROOT}/repo/automation/deploy.yml.tpl" "${workspace_root}/automations/.github/workflows/deploy.yml"
   fi
 
+  # --- Backend deploy workflows ---
   if [[ -n "${backend_repo_names[*]-}" ]]; then
     for repo in "${backend_repo_names[@]}"; do
       export CTO_SERVICE_NAME="$repo"
-      render_template_file "${TEMPLATE_ROOT}/repo/backend/deploy.yml.tpl" "${workspace_root}/${repo}/.github/workflows/deploy.yml"
+      if (( current_phase <= 1 )); then
+        # Phase 0–1: Railway-oriented workflow
+        render_template_file "${TEMPLATE_ROOT}/repo/backend/deploy-railway.yml.tpl" "${workspace_root}/${repo}/.github/workflows/deploy.yml"
+      else
+        # Phase 2+: ECS-oriented workflow
+        render_template_file "${TEMPLATE_ROOT}/repo/backend/deploy.yml.tpl" "${workspace_root}/${repo}/.github/workflows/deploy.yml"
+      fi
     done
   fi
 
+  # --- Web CI ---
   if [[ -n "${web_app_names[*]-}" && -n "$web_repo_name" ]]; then
     render_template_file "${TEMPLATE_ROOT}/repo/web/ci.yml.tpl" "${workspace_root}/${web_repo_name}/.github/workflows/ci.yml"
   fi
@@ -687,6 +783,7 @@ if [[ "$render_templates" == "true" ]]; then
     render_template_file "${TEMPLATE_ROOT}/repo/web/ci.yml.tpl" "${workspace_root}/internal-tools/.github/workflows/ci.yml"
   fi
 
+  # --- Mobile ---
   if [[ "$include_mobile" == "true" && -n "${mobile_repo_names[*]-}" ]]; then
     for app in "${mobile_repo_names[@]}"; do
       app_slug="$(slugify "$app")"
@@ -698,10 +795,19 @@ if [[ "$render_templates" == "true" ]]; then
   fi
 fi
 
+# =============================================================================
+# Summary
+# =============================================================================
+
 echo ""
 echo "Manifest written to: $manifest_path"
 echo ""
 echo "Selected phase: $phase_title_text"
+if (( current_phase <= 1 )); then
+  echo "Deploy target: Railway (PaaS) — graduate to AWS + ECS at Phase 2"
+else
+  echo "Deploy target: AWS + ECS Fargate"
+fi
 echo "$phase_recommendation_text"
 echo ""
 echo "Recommended repo set:"
@@ -719,7 +825,14 @@ fi
 
 echo ""
 echo "Immediate next steps:"
-echo "  1. Open $(printf '%q' "$manifest_path") and confirm the repo plan."
-echo "  2. Review the generated starter files and tighten each workflow for real secrets and deploy targets."
-echo "  3. Use CTO-IN-A-BOX.md as the phased buildout guide while fleshing out the templates."
+if (( current_phase <= 1 )); then
+  echo "  1. Open $(printf '%q' "$manifest_path") and confirm the repo plan."
+  echo "  2. Review the generated starter files."
+  echo "  3. Deploy to Railway: link your repo at https://railway.app and push."
+  echo "  4. When you need production infrastructure, re-run at Phase 2."
+else
+  echo "  1. Open $(printf '%q' "$manifest_path") and confirm the repo plan."
+  echo "  2. Review the generated starter files and tighten each workflow for real secrets and deploy targets."
+  echo "  3. Use CTO-IN-A-BOX.md as the phased buildout guide while fleshing out the templates."
+fi
 echo ""

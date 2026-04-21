@@ -55,7 +55,7 @@ Templated starter scripts live in `scripts/`:
 
 - `check-deployment.sh` — single command to answer "is prod live?"
 - `ecs-logs.sh`, `waf-logs.sh`, `flow-logs.sh` — log readers for backend, WAF, and VPC
-- `db-tunnel.sh`, `db-tunnel-dev.sh` — port-forward to RDS via SSM (TODOs to fill in once infra exists)
+- `db-tunnel.sh` — port-forward to RDS via SSM; use `--env dev` or `--env prod` (TODOs to fill in once infra exists)
 - `check-mobile-builds.sh` — EAS build + TestFlight tracker (TODOs to fill in)
 - `terraform-pre-apply-guard.sh` — universal guardrails before `terraform apply`
 - `prisma-check-sync.sh` — block deploy if migrations haven't been applied

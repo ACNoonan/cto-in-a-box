@@ -2,7 +2,7 @@
 
 > **STATUS: NOT YET FILLED IN — agent, please complete this rule before debugging a production issue or writing a new ops script.**
 >
-> The kit ships a starter set of ops scripts in `scripts/` (deployment checker, ECS log reader, DB tunnel, WAF/flow log readers, mobile build tracker). This rule documents how to use them and which to reach for in which situation.
+> The kit ships a starter set of ops scripts in `scripts/` (deployment checker, ECS log reader, DB tunnel, WAF/flow log readers, mobile build tracker) once you reach Phase 2 (Production Baseline). At Phase 0–1 (Railway), these scripts do not exist yet. This rule documents how to use them and which to reach for in which situation.
 >
 > **Your job:** before responding to "something is broken in prod" or before adding a new ops script, interview the user (one short batched message).
 >
@@ -12,7 +12,7 @@
 > 2. Which scripts in `scripts/` are wired up and which are still TODO? (Check the script headers — db-tunnel, mobile builds, etc. ship with `# TODO:` placeholders.)
 > 3. Where do app logs go? (CloudWatch log group, Datadog, Logflare, etc.) Which script reads them? (`scripts/ecs-logs.sh`.)
 > 4. Where do WAF and VPC flow logs land? Which script reads them? (`scripts/waf-logs.sh`, `scripts/flow-logs.sh`.)
-> 5. How does an engineer get into the prod database for a one-off query? (`scripts/db-tunnel.sh`.) Who is allowed?
+> 5. How does an engineer get into the prod database for a one-off query? (`scripts/db-tunnel.sh --env prod`.) Who is allowed?
 > 6. How does an engineer check mobile build state? (`scripts/check-mobile-builds.sh`.)
 > 7. What's the on-call rotation, if any? Who gets paged for what?
 > 8. What is the incident-comms channel? (Slack? Discord? PagerDuty?)
@@ -31,7 +31,7 @@
 
 ## Database Access
 
-<!-- db-tunnel.sh / db-tunnel-dev.sh — when, who, with what permissions -->
+<!-- db-tunnel.sh --env prod / db-tunnel.sh --env dev — when, who, with what permissions -->
 
 ## Mobile Build State
 

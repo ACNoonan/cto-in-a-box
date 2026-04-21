@@ -22,8 +22,8 @@ The bootstrapper asks for the project's current phase and generates only the art
 Phase-to-output mapping (abbreviated):
 
 - **Phase 0 — Local MVP:** workspace handbook, agent harness, first backend or surface scaffold.
-- **Phase 1 — Deployed Demo:** adds `infrastructure/`, first Terraform roots, first backend deploy workflow.
-- **Phase 2 — Production Baseline:** adds path-aware Terraform workflows, CI guardrails, ops scripts pack.
+- **Phase 1 — Deployed Demo:** Railway-oriented CI/deploy workflow, basic environment conventions.
+- **Phase 2 — Production Baseline:** graduates to AWS + ECS; adds `infrastructure/`, Terraform roots, path-aware Terraform workflows, CI guardrails, ops scripts pack.
 - **Phase 3 — Scale & Expansion:** adds mobile, contract harness, automations, internal tools as needed.
 - **Phase 4 — Reusable Platform:** adds reusable template libraries and starter kits.
 

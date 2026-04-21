@@ -135,16 +135,19 @@ The default platform profile for this initiative is:
 
 This is not because these choices are globally perfect. It is because repeated decisions compound and platform variance carries a real tax.
 
-### Why ECS is the default, not Kubernetes
+### Why Railway first, then ECS
 
-CTO in a box should explicitly assume ECS over Kubernetes by default.
+The biggest UX cliff in any bootstrap experience is the jump from "working locally" to "deployed somewhere people can see it." Doing that with AWS + Terraform + ECS requires VPCs, ALBs, ECR, IAM roles, Secrets Manager, CloudWatch, and a state backend — before a single stakeholder has seen the product.
 
-That is the right default when the goal is:
+CTO in a box uses Railway (or a comparable PaaS like Render or Fly.io) as the default for Phase 1 (Deployed Demo). The deploy path is `git push` or `railway up`. Railway handles TLS, DNS, managed Postgres, and zero-downtime deploys without any infrastructure code.
 
-- low operational overhead
-- fast bootstrap time
-- clear deploy paths for a small team
-- strong AWS alignment without building a platform team too early
+ECS becomes the default at Phase 2 (Production Baseline) when operational control, cost predictability, and infrastructure-as-code discipline justify the complexity.
+
+| Phase | Compute | Infrastructure |
+|-------|---------|----------------|
+| 0 — Local MVP | localhost | None |
+| 1 — Deployed Demo | Railway (PaaS) | None (managed by Railway) |
+| 2+ — Production | ECS Fargate | Terraform on AWS |
 
 Kubernetes should be treated as an override path, not the baseline. It becomes justified when there is a real reason such as:
 
@@ -210,53 +213,69 @@ Prove the product locally with the smallest system that can still evolve cleanly
 
 ### Goal
 
-Move from local-only progress to one shared deployed environment that stakeholders can actually use.
+Move from local-only progress to one shared deployed environment that stakeholders can actually use. Use a PaaS (Railway by default) so the team spends zero time on infrastructure.
 
 ### What changes in this phase
 
-- the infrastructure repo becomes active
-- Terraform roots become real rather than aspirational
-- the first backend service gets a real deploy path
-- demo or dev environments become explicit
-- secrets, domains, and environment naming stop being informal
+- the first backend service gets a real deploy path via Railway
+- demo or dev environments become explicit (Railway environments)
+- a managed Postgres database replaces the local dev database
+- secrets live in Railway's environment variable system
+- GitHub CI runs lint, typecheck, and tests; Railway handles deploy on push
+
+### What should wait for Phase 2
+
+- Terraform and infrastructure-as-code
+- ECS, ECR, VPC, ALB, CloudWatch
+- ops scripts that assume AWS primitives
+- WAF, VPC flow logs, bastion tunnels
 
 ### Strong defaults
 
-- keep infrastructure in its own repo
-- use Terraform from the beginning of deployed infrastructure
-- use ECS as the default compute target for backend services
-- keep the number of deployed services small
+- deploy to Railway with GitHub integration (push to deploy)
+- keep the number of deployed services small (one backend, one web)
+- use Railway's managed Postgres for the database
+- keep environment variables in Railway's dashboard or CLI
 
 ### Required artifacts
 
-- `infrastructure/terraform/`
-- environment naming conventions
-- first ECS service definition and ECR naming
-- first deploy workflow
-- basic deploy verification path
+- Railway project linked to GitHub repo
+- first CI workflow (lint, typecheck, test)
+- environment naming conventions (dev, demo)
+- basic deploy verification path (health check URL)
 
 ### Exit criteria
 
-- a stakeholder can access a shared deployed system
-- infrastructure changes are reviewable
-- there is one obvious command or workflow to verify a deploy
+- a stakeholder can access a shared deployed system via a Railway URL
+- CI runs on every PR
+- the team has a clear path to Phase 2 when they need production-grade infrastructure
 
 ## Phase 2: Production Baseline
 
 ### Goal
 
-Make production boring enough that releases, migrations, and debugging are procedural rather than heroic.
+Graduate from Railway to AWS + Terraform + ECS. Make production boring enough that releases, migrations, and debugging are procedural rather than heroic.
 
 ### What to add
 
+- infrastructure repo with Terraform roots
+- ECS Fargate as the compute target; ECR for images
 - protected branch and promotion model
-- separate prod and dev environments
+- separate prod and dev environments on AWS
 - CI/CD with lint, typecheck, test, migration checks, and deploy gates
 - Terraform guardrails and path-aware workflows
 - deployment verification script
 - ECS log reader
 - DB tunnel workflow
 - preview environments where they materially reduce risk
+
+### Migration from Railway
+
+- Terraform creates the VPC, ALB, ECS cluster, RDS, and supporting resources
+- Backend deploy workflows switch from Railway push-to-deploy to ECR image build + ECS service update
+- Database migrates from Railway managed Postgres to RDS
+- Environment variables move from Railway to AWS Secrets Manager
+- Re-run the bootstrapper at Phase 2 to generate the new scaffolding
 
 ### Testing stance
 
@@ -447,16 +466,17 @@ The bootstrapper should capture at least:
 
 ### Phase 1: Deployed Demo
 
-- infrastructure repo scaffold
-- Terraform roots
-- first backend deploy workflow
+- Railway-oriented CI workflow (lint, typecheck, test; Railway handles deploy)
 - basic environment and secret conventions
+- health check verification path
 
 ### Phase 2: Production Baseline
 
+- infrastructure repo scaffold and Terraform roots
+- ECS-oriented backend deploy workflows
 - path-aware Terraform workflow
 - backend and web CI/CD guardrails
-- ops scripts starter pack
+- ops scripts starter pack (deploy checker, ECS logs, DB tunnel, WAF/flow logs)
 - deploy, logs, and DB access workflows
 
 ### Phase 3: Scale And Expansion
@@ -489,8 +509,8 @@ The bootstrapper should capture at least:
 If starting again from scratch, the recommended order is:
 
 1. local MVP with one clear domain and one primary surface
-2. first shared deployed demo on the default AWS, Terraform, and ECS path
-3. production baseline with guardrails, ops scripts, and predictable deploys
+2. first shared deployed demo on Railway (PaaS) — a URL stakeholders can use in minutes, not days
+3. production baseline on AWS + Terraform + ECS with guardrails, ops scripts, and predictable deploys
 4. scale and expansion only when more surfaces or teams make it necessary
 5. reusable platform templates once the operating model is truly proven
 
