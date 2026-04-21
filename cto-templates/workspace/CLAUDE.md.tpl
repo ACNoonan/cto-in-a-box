@@ -8,7 +8,6 @@ The parent workspace exists to make cross-repo engineering predictable:
 
 - shared branch strategy
 - shared deployment expectations
-- shared ops scripts
 - shared agent rules
 - shared debugging workflows
 
@@ -26,8 +25,7 @@ Full bounded-context map, supporting subdomains, and the ubiquitous language glo
 
 ## Default Conventions
 
-- Region: `{{AWS_REGION}}`
-- Environments: `{{ENVIRONMENTS_INLINE}}`
+- Deploy target: {{DEPLOY_TARGET_DESC}}
 - Working branch: `{{DEV_BRANCH}}`
 - Production branch: `{{PROD_BRANCH}}`
 
@@ -39,11 +37,7 @@ Full bounded-context map, supporting subdomains, and the ubiquitous language glo
 
 ## Bootstrap Priorities
 
-1. Stand up infrastructure and environment naming first.
-2. Add CI/CD before relying on memory-based deploys.
-3. Install operational scripts before launch pressure.
-4. Add agent harnesses early so norms are encoded.
-5. Add contract checks once multiple repos share APIs.
+{{BOOTSTRAP_PRIORITIES}}
 
 ## Agent Rules Are Skeletons
 
@@ -51,13 +45,4 @@ Full bounded-context map, supporting subdomains, and the ubiquitous language glo
 
 ## Operational Scripts
 
-Templated starter scripts live in `scripts/`:
-
-- `check-deployment.sh` — single command to answer "is prod live?"
-- `ecs-logs.sh`, `waf-logs.sh`, `flow-logs.sh` — log readers for backend, WAF, and VPC
-- `db-tunnel.sh` — port-forward to RDS via SSM; use `--env dev` or `--env prod` (TODOs to fill in once infra exists)
-- `check-mobile-builds.sh` — EAS build + TestFlight tracker (TODOs to fill in)
-- `terraform-pre-apply-guard.sh` — universal guardrails before `terraform apply`
-- `prisma-check-sync.sh` — block deploy if migrations haven't been applied
-
-Add a script the second time the team works around the same operational gap.
+{{OPS_SCRIPTS_SECTION}}

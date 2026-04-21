@@ -21,12 +21,6 @@ Add a new file (and add it to this README) the second time you see an engineer o
 
 ## Files
 
-- [backend-patterns.md](backend-patterns.md) — service architecture, error shapes, validation, ORM conventions
-- [database-migrations.md](database-migrations.md) — migration workflow, drift detection, dev↔prod sync
-- [deployment.md](deployment.md) — branch model, who deploys what, post-deploy verification
-- [testing.md](testing.md) — testing pyramid per surface (backend, web, mobile)
-- [contracts.md](contracts.md) — cross-repo API contracts (when applicable)
-- [mobile-patterns.md](mobile-patterns.md) — OTA vs native, EAS channels, TestFlight (mobile only)
-- [infrastructure.md](infrastructure.md) — Terraform discipline, environment naming, secrets
-- [operations.md](operations.md) — debugging workflow, log readers, incident response
-- [security.md](security.md) — secrets handling, auth audit, credential rotation
+{{RULES_FILE_LIST}}
+
+Additional rule files are added when you move to later phases. Re-run `cto-bootstrap.sh` at the next phase to generate them.

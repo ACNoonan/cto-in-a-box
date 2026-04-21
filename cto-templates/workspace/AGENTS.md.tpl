@@ -22,17 +22,13 @@ Full domain map and ubiquitous language in [`DOMAIN.md`](./DOMAIN.md). Read it b
 ## Operating Rules
 
 - Run git commands inside the correct child repo, never from the workspace root.
-- Keep shared ops scripts in `infrastructure/scripts/`.
-- Treat the parent workspace as the system of record for cross-repo conventions.
+{{OPS_RULES_LINE}}- Treat the parent workspace as the system of record for cross-repo conventions.
 - Keep agent guidance at the workspace root and deep domain guidance closer to code.
 - Keep `DOMAIN.md` roughly honest — add terms as they appear in conversations, do not silently coin new synonyms in code.
 
 ## CI/CD Expectations
 
-- Backend repos: lint, typecheck, tests, and deploy pipelines
-- Infrastructure repo: path-aware Terraform workflow
-- Web repos: preview and production deployment path
-- Mobile repos: PR validation plus manual EAS/TestFlight workflows
+{{CICD_EXPECTATIONS}}
 
 ## Agent Harness
 
@@ -41,6 +37,7 @@ If enabled, this workspace uses:
 - `.claude/rules/` — durable engineering norms (see `.claude/rules/_README.md`)
 - `.cursor/rules/` — Cursor-format guidance
 - `.claude/settings.json` and `.claude/hooks/` — Claude Code guardrails
-- `.agents/skills/` — reusable skills shared across tools
 
-**Important for agents:** every file in `.claude/rules/` ships as a skeleton with a self-prompt at the top. The first time you hit a task that touches one of these areas (backend code, migrations, deploys, tests, contracts, mobile, infra, ops, security), open the matching rule file, follow the self-prompt to interview the user, replace the prompt with the answers, and commit. Do not silently invent norms — they will not stick.
+**Important for agents:** every file in `.claude/rules/` ships as a skeleton with a self-prompt at the top. The first time you hit a task that touches one of these areas, open the matching rule file, follow the self-prompt to interview the user, replace the prompt with the answers, and commit. Do not silently invent norms — they will not stick.
+
+{{PHASE_GRADUATION}}

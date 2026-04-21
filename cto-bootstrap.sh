@@ -705,6 +705,177 @@ export CTO_DB_NAME="${project_slug//-/_}"
 export CTO_DB_SECRET_ID="${project_slug}/prod/database-url"
 export CTO_DB_SECRET_ID_DEV="${project_slug}/dev/database-url"
 
+# --- Phase-aware content blocks for templates ---
+
+# Operating rules — only mention infra scripts when they exist
+if (( current_phase >= 2 )); then
+  printf -v ops_rules_line '%s\n' '- Keep shared ops scripts in `scripts/`.'
+else
+  ops_rules_line=""
+fi
+export CTO_OPS_RULES_LINE="$ops_rules_line"
+
+# CI/CD expectations — only list surfaces that are in scope
+cicd_lines="- Backend repos: lint, typecheck, tests, and deploy pipelines"
+if (( current_phase >= 2 )); then
+  cicd_lines+=$'\n- Infrastructure repo: path-aware Terraform workflow'
+fi
+if [[ -n "${web_app_names[*]-}" ]]; then
+  cicd_lines+=$'\n- Web repos: preview and production deployment path'
+fi
+if [[ "$include_mobile" == "true" ]]; then
+  cicd_lines+=$'\n- Mobile repos: PR validation plus manual EAS/TestFlight workflows'
+fi
+export CTO_CICD_EXPECTATIONS="$cicd_lines"
+
+# Ops scripts section — only describe scripts that actually exist
+if (( current_phase >= 2 )); then
+  ops_section="Templated starter scripts live in \`scripts/\`:
+
+- \`check-deployment.sh\` — single command to answer \"is prod live?\"
+- \`ecs-logs.sh\`, \`waf-logs.sh\`, \`flow-logs.sh\` — log readers for backend, WAF, and VPC
+- \`db-tunnel.sh\` — port-forward to RDS via SSM; use \`--env dev\` or \`--env prod\`
+- \`terraform-pre-apply-guard.sh\` — universal guardrails before \`terraform apply\`
+- \`prisma-check-sync.sh\` — block deploy if migrations haven't been applied"
+  if [[ "$include_mobile" == "true" ]]; then
+    ops_section+=$'\n- \`check-mobile-builds.sh\` — EAS build + TestFlight tracker'
+  fi
+  ops_section+=$'\n\nAdd a script the second time the team works around the same operational gap.'
+else
+  ops_section="Ops scripts (\`check-deployment.sh\`, \`ecs-logs.sh\`, \`db-tunnel.sh\`, etc.) are generated when you graduate to Phase 2 (Production Baseline) and have AWS infrastructure to operate."
+fi
+export CTO_OPS_SCRIPTS_SECTION="$ops_section"
+
+# Phase graduation guidance
+case "$current_phase" in
+  0)
+    graduation_section="## Current Phase: Phase 0 — Local MVP
+
+You are here. The goal is to prove the product locally with the smallest system that can still evolve cleanly.
+
+### You are ready for Phase 1 (Deployed Demo) when:
+
+- [ ] One primary domain can be modeled and changed safely
+- [ ] The local setup is reproducible by another engineer or agent
+- [ ] A stakeholder needs to see or use the product (not just hear about it)
+- [ ] You want a shared URL, not just localhost
+
+### What Phase 1 adds:
+
+- Deploy to Railway (PaaS) — a shared URL in minutes
+- Railway-managed Postgres replaces local database
+- CI workflow runs lint, typecheck, and tests on every push
+- Environment variables and secrets move to Railway's dashboard
+
+To move: re-run \`cto-bootstrap.sh\` in the cto-in-a-box repo and pick Phase 1."
+    ;;
+  1)
+    graduation_section="## Current Phase: Phase 1 — Deployed Demo
+
+You are here. The product is deployed on Railway and stakeholders can access it.
+
+### You are ready for Phase 2 (Production Baseline) when:
+
+- [ ] Real users (not just the team) will depend on the service being up
+- [ ] You need separate prod and dev environments with different data
+- [ ] You need infrastructure-as-code for auditability or compliance
+- [ ] Cost predictability matters more than deployment simplicity
+- [ ] You need operational tooling: log readers, deploy verification, DB tunnels
+
+### What Phase 2 adds:
+
+- AWS infrastructure with Terraform (VPC, ALB, ECS, RDS, Secrets Manager)
+- ECS Fargate replaces Railway as the compute target
+- Full ops scripts pack: deploy checker, log readers, DB tunnel, WAF/flow logs
+- Infrastructure and operations agent rules
+- Protected branch model and deploy gates
+
+To move: re-run \`cto-bootstrap.sh\` in the cto-in-a-box repo and pick Phase 2."
+    ;;
+  2)
+    graduation_section="## Current Phase: Phase 2 — Production Baseline
+
+You are here. Production is boring: deploys are procedural, rollbacks are documented, logs are accessible.
+
+### You are ready for Phase 3 (Scale & Expansion) when:
+
+- [ ] You need additional delivery surfaces (mobile, internal tools, new portals)
+- [ ] Multiple repos depend on shared APIs and drift is becoming a problem
+- [ ] Background jobs or integrations need their own service boundary
+- [ ] The team is large enough that cross-repo coordination needs mechanical help
+
+### What Phase 3 adds:
+
+- Mobile app scaffolding with EAS/TestFlight workflows
+- Cross-repo contract harness
+- Automations repo for background jobs
+- Internal tools repo
+- Mobile-patterns and contracts agent rules
+
+To move: re-run \`cto-bootstrap.sh\` in the cto-in-a-box repo and pick Phase 3."
+    ;;
+  3)
+    graduation_section="## Current Phase: Phase 3 — Scale & Expansion
+
+You are here. Multiple surfaces, teams, and services are shipping without collapsing into coordination tax.
+
+### You are ready for Phase 4 (Reusable Platform) when:
+
+- [ ] You are spinning up a second product or team that needs the same operating model
+- [ ] The patterns are proven enough to package as templates and starter kits
+- [ ] You want new projects to inherit the operating system, not reinvent it
+
+### What Phase 4 adds:
+
+- Reusable template libraries and starter kits
+- Standardized ops and agent harness packages
+- Bootstrap questionnaires that generate new projects from the proven model
+
+To move: re-run \`cto-bootstrap.sh\` in the cto-in-a-box repo and pick Phase 4."
+    ;;
+  4)
+    graduation_section="## Current Phase: Phase 4 — Reusable Platform
+
+You are here. The operating model is a product itself — reusable across teams and products.
+
+### Ongoing focus:
+
+- Keep tightening templates based on real usage
+- Only add complexity when repeated use proves it belongs
+- Maintain the operating system; don't let it calcify"
+    ;;
+  *)
+    graduation_section=""
+    ;;
+esac
+export CTO_PHASE_GRADUATION="$graduation_section"
+
+# Deploy target description for CLAUDE.md
+if (( current_phase <= 1 )); then
+  export CTO_DEPLOY_TARGET_DESC="Railway (PaaS). Deploy by pushing to the linked GitHub repo."
+else
+  export CTO_DEPLOY_TARGET_DESC="AWS ECS Fargate via Terraform. Deploy by merging to \`${prod_branch}\`."
+fi
+
+# Bootstrap priorities — phase-appropriate
+if (( current_phase == 0 )); then
+  export CTO_BOOTSTRAP_PRIORITIES="1. Model the core domain and make the data truth explicit.
+2. Make the local setup reproducible.
+3. Add agent harnesses early so norms are encoded.
+4. When a stakeholder needs to see the product, move to Phase 1 and deploy to Railway."
+elif (( current_phase == 1 )); then
+  export CTO_BOOTSTRAP_PRIORITIES="1. Link the backend repo to Railway and get a shared URL live.
+2. Add CI (lint, typecheck, test) before relying on memory-based quality.
+3. Fill in agent rule skeletons as you touch each area.
+4. When you need production-grade infrastructure, move to Phase 2."
+else
+  export CTO_BOOTSTRAP_PRIORITIES="1. Stand up infrastructure and environment naming first.
+2. Add CI/CD before relying on memory-based deploys.
+3. Install operational scripts before launch pressure.
+4. Add agent harnesses early so norms are encoded.
+5. Add contract checks once multiple repos share APIs."
+fi
+
 # =============================================================================
 # Render templates
 # =============================================================================
@@ -724,7 +895,51 @@ if [[ "$render_templates" == "true" ]]; then
     render_template_file "${TEMPLATE_ROOT}/workspace/.claude/hooks/terraform-safety.sh.tpl" "${workspace_root}/.claude/hooks/terraform-safety.sh"
     chmod +x "${workspace_root}/.claude/hooks/pre-commit-lint.sh" "${workspace_root}/.claude/hooks/terraform-safety.sh"
 
-    for rule in _README backend-patterns database-migrations deployment testing contracts mobile-patterns infrastructure operations security; do
+    # Phase-appropriate rule skeletons — don't clutter early phases with
+    # rules for areas the project hasn't entered yet.
+    agent_rules=(backend-patterns database-migrations testing)
+    if (( current_phase >= 1 )); then
+      agent_rules+=(deployment security)
+    fi
+    if (( current_phase >= 2 )); then
+      agent_rules+=(infrastructure operations)
+    fi
+    if [[ "$include_mobile" == "true" ]]; then
+      agent_rules+=(mobile-patterns)
+    fi
+    if [[ "$include_contract_harness" == "true" ]]; then
+      agent_rules+=(contracts)
+    fi
+
+    # Build the _README file list from the actual rules rendered
+    rules_file_list=""
+    for r in "${agent_rules[@]}"; do
+      case "$r" in
+        backend-patterns)    rules_file_list+="- [backend-patterns.md](backend-patterns.md) — service architecture, error shapes, validation, ORM conventions
+" ;;
+        database-migrations) rules_file_list+="- [database-migrations.md](database-migrations.md) — migration workflow, drift detection, dev/prod sync
+" ;;
+        testing)             rules_file_list+="- [testing.md](testing.md) — testing pyramid per surface (backend, web, mobile)
+" ;;
+        deployment)          rules_file_list+="- [deployment.md](deployment.md) — branch model, who deploys what, post-deploy verification
+" ;;
+        security)            rules_file_list+="- [security.md](security.md) — secrets handling, auth audit, credential rotation
+" ;;
+        infrastructure)      rules_file_list+="- [infrastructure.md](infrastructure.md) — Terraform discipline, environment naming, secrets
+" ;;
+        operations)          rules_file_list+="- [operations.md](operations.md) — debugging workflow, log readers, incident response
+" ;;
+        mobile-patterns)     rules_file_list+="- [mobile-patterns.md](mobile-patterns.md) — OTA vs native, EAS channels, TestFlight (mobile only)
+" ;;
+        contracts)           rules_file_list+="- [contracts.md](contracts.md) — cross-repo API contracts
+" ;;
+      esac
+    done
+    rules_file_list="${rules_file_list%$'\n'}"
+    export CTO_RULES_FILE_LIST="$rules_file_list"
+
+    render_template_file "${TEMPLATE_ROOT}/workspace/.claude/rules/_README.md.tpl" "${workspace_root}/.claude/rules/_README.md"
+    for rule in "${agent_rules[@]}"; do
       render_template_file "${TEMPLATE_ROOT}/workspace/.claude/rules/${rule}.md.tpl" "${workspace_root}/.claude/rules/${rule}.md"
     done
   fi
